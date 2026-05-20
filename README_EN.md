@@ -62,12 +62,23 @@ ops_cuda_softmax/
 - **Slower than Level 3** — Softmax lacks data reuse; `__syncthreads()` overhead > SMEM benefit
 - Key counter-example: not all GPU optimizations apply to all workloads
 
+## Nsight Compute Analysis (4096×4096 FP32)
+
+| Kernel | SM Busy | IPC | DRAM% | MemSOL | CmpSOL | NoElig | Bottleneck |
+|--------|---------|-----|-------|--------|--------|--------|------------|
+| Naive | 6.4% | 0.26 | 17.1% | 34.4% | 2.7% | 93.6% | Thread count |
+| Online | 9.9% | 0.39 | 16.5% | 40.3% | 4.1% | 90.1% | Thread count |
+| Warp | 22.9% | 0.91 | **84.1%** | 84.1% | 22.0% | 77.2% | **DRAM bandwidth** |
+| Warp+float4 | 24.5% | 0.98 | **90.2%** | 90.2% | 23.2% | 75.7% | **DRAM bandwidth** |
+| Warp+Tiled | **84.5%** | **3.38** | 58.3% | 58.3% | **84.0%** | **15.5%** | **expf compute** |
+
+> Warp+float4 hits 90.2% DRAM utilization (392 GB/s of 448 GB/s theoretical). Tiled flips to Compute-Bound (84% Compute SOL) but barrier overhead exceeds bandwidth savings.
+
 ## Key Findings
 
-- **Coalesced access is foundational**: stride-32 is 5-19x faster than stride-N
-- **float4 helps marginally**: reduces LDG count, useful at large N
-- **SMEM tiling does NOT help Softmax**: no data reuse, barrier overhead dominates — key contrast with GEMM
-- **Remaining gap (1.46x) is in expf**: torch likely uses table-lookup / polynomial approximation for faster exp
+- **Warp+float4 is DRAM-bandwidth-saturated**: 392 GB/s (90% peak), no SMEM needed
+- **SMEM tiling fails for Softmax**: no data reuse, barrier + expf cost > DRAM savings — key contrast with GEMM
+- **Remaining gap (1.46x) is fast-expf**: DRAM is maxed out; torch likely uses table-lookup / polynomial approx
 
 ## Documentation
 

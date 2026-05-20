@@ -67,12 +67,24 @@ ops_cuda_softmax/
 - **反而比 Level 3 慢**——Softmax 没有 GEMM 那样的数据复用，`__syncthreads()` 开销 > SMEM 收益
 - 重要反例：不是所有 GPU 优化都适用于所有场景
 
+## Nsight Compute 分析 (4096×4096 FP32)
+
+| Kernel | SM Busy | IPC | DRAM% | MemSOL | CmpSOL | NoElig | 瓶颈 |
+|--------|---------|-----|-------|--------|--------|--------|------|
+| Naive | 6.4% | 0.26 | 17.1% | 34.4% | 2.7% | 93.6% | 线程数不足 |
+| Online | 9.9% | 0.39 | 16.5% | 40.3% | 4.1% | 90.1% | 线程数不足 |
+| Warp | 22.9% | 0.91 | **84.1%** | 84.1% | 22.0% | 77.2% | **DRAM 带宽** |
+| Warp+float4 | 24.5% | 0.98 | **90.2%** | 90.2% | 23.2% | 75.7% | **DRAM 带宽** |
+| Warp+Tiled | **84.5%** | **3.38** | 58.3% | 58.3% | **84.0%** | **15.5%** | **expf 计算** |
+
+> Warp+float4 DRAM 利用率 90.2%（448 GB/s 理论 → 实测 392 GB/s），已接近硬件带宽上限。Tiled 翻转为 Compute-Bound（84% Compute SOL）但 barrier 开销反超了带宽节省。
+
 ## 核心发现
 
-- **合并访存是 Softmax 优化的根基**：stride-32 比 stride-N 快 5-19x
-- **float4 向量化锦上添花**：减少 LDG 指令，大 N 时有用
-- **SMEM 分块对 Softmax 无效**：没有数据复用，barrier 开销超过收益——与 GEMM 形成关键对比
-- **剩余瓶颈在 expf 计算**：与 torch 的 1.46x 差距主要来自更优的指数函数实现
+- **Warp+float4 已触及 DRAM 带宽天花板**：392 GB/s（90% 理论峰值），无需 SMEM
+- **SMEM 分块对 Softmax 无效**：无数据复用，barrier 开销 + expf 瓶颈 > DRAM 带宽节省
+- **与 torch 的 1.46x 差距在 fast-expf**：DRAM 带宽已榨干，剩余差距来自更优的指数函数实现（查表/多项式近似）
+- **注意对比 GEMM**：GEMM 中 SMEM tiling 核心收益来自数据复用（BK 次），Softmax 每个元素只用 2 次——判若云泥
 
 ## 文档
 
