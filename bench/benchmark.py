@@ -40,6 +40,8 @@ def run():
         ("Naive",          softmax_ops.softmax_naive),
         ("Online",         softmax_ops.softmax_online),
         ("Warp",           softmax_ops.softmax_warp),
+        ("Warp+float4",    softmax_ops.softmax_warp_float4),
+        ("Warp+Tiled",     softmax_ops.softmax_warp_tiled),
         ("torch.softmax",  lambda t: torch.softmax(t, dim=-1)),
     ]
 
@@ -74,7 +76,7 @@ def run():
     print(f"\nResults: {results_dir}")
 
     # Summary table
-    knames = ["Naive", "Online", "Warp", "torch.softmax"]
+    knames = ["Naive", "Online", "Warp", "Warp+float4", "Warp+Tiled", "torch.softmax"]
     print(f"\n{'='*80}")
     print(f"  SUMMARY (time in us)")
     print(f"{'='*80}")
