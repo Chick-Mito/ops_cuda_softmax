@@ -8,10 +8,12 @@
 
 | Kernel | 算法 | 时间 | 带宽 | vs Naive |
 |--------|------|------|------|----------|
-| Naive | 3-pass, 1 线程/行 | 2779 us | 48 GB/s | 1.0x |
-| Online | 2-pass, 1 线程/行 | 2107 us | 64 GB/s | 1.3x |
-| **Warp** | **Warp 级在线算法, 32 线程/行** | **545 us** | **246 GB/s** | **5.1x** |
-| torch.softmax | cuBLAS/cuDNN | 414 us | 324 GB/s | 6.7x |
+| Naive | 3-pass, 1 线程/行 | 2824 us | 48 GB/s | 1.0x |
+| Online | 2-pass, 1 线程/行 | 2168 us | 62 GB/s | 1.3x |
+| **Warp** | **Warp 级在线算法, 32 线程/行** | **572 us** | **235 GB/s** | **4.9x** |
+| torch.softmax | cuBLAS/cuDNN | 362 us | 371 GB/s | 7.8x |
+
+> Warp vs torch.softmax: 1.6x 差距。512×512 时几乎持平（5.7 vs 5.0 us）。差距来自 SMEM 分块 + float4 向量化——每一项都是微优化。
 
 ## 快速开始
 
