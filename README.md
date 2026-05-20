@@ -1,17 +1,19 @@
 # ops_cuda_softmax
 
-Hand-rolled CUDA Softmax — 3 kernels, from naive to warp-level, on RTX 3060 Ti.
+[English](README_EN.md)
 
-## Performance (4096×4096 FP32)
+手写 CUDA Softmax——3 个 kernel，从朴素实现到 Warp 级并行，单卡 RTX 3060 Ti。
 
-| Kernel | Algorithm | Time | Bandwidth | vs Naive |
-|--------|-----------|------|-----------|----------|
-| Naive | 3-pass, 1 thread/row | 2779 us | 48 GB/s | 1.0x |
-| Online | 2-pass, 1 thread/row | 2107 us | 64 GB/s | 1.3x |
-| **Warp** | **Warp-level online, 32 threads/row** | **545 us** | **246 GB/s** | **5.1x** |
+## 性能 (4096×4096 FP32)
+
+| Kernel | 算法 | 时间 | 带宽 | vs Naive |
+|--------|------|------|------|----------|
+| Naive | 3-pass, 1 线程/行 | 2779 us | 48 GB/s | 1.0x |
+| Online | 2-pass, 1 线程/行 | 2107 us | 64 GB/s | 1.3x |
+| **Warp** | **Warp 级在线算法, 32 线程/行** | **545 us** | **246 GB/s** | **5.1x** |
 | torch.softmax | cuBLAS/cuDNN | 414 us | 324 GB/s | 6.7x |
 
-## Quick Start
+## 快速开始
 
 ```bash
 conda activate ainfra
@@ -19,46 +21,52 @@ python setup.py build_ext --inplace
 python bench/benchmark.py
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 ops_cuda_softmax/
 ├── src/
-│   ├── softmax_kernels.cu       # 3 kernels + bridge functions
-│   └── softmax_wrapper.cpp      # pybind11 bridge
+│   ├── softmax_kernels.cu       # 3 个 kernel + bridge 函数
+│   └── softmax_wrapper.cpp      # pybind11 桥接
 ├── bench/
-│   └── benchmark.py             # Performance test (5 sizes)
+│   └── benchmark.py             # 性能测试 (5 种规模)
 ├── docs/
-│   └── softmax_analysis.md      # Full analysis doc
+│   └── softmax_analysis.md      # 完整分析文档
 ├── setup.py
-└── README.md
+├── README.md / README_EN.md
 ```
 
-## Kernel Overview
+## Kernel 概览
 
 ### Level 1 — Naive Softmax
-- 1 thread per row, 3 passes: find max → exp sum → normalize
-- Bottleneck: uncoalesced global memory access (stride-N)
+- 1 线程/行，3 次遍历：找最大值 → exp 求和 → 归一化
+- 瓶颈：非合并全局内存访问 (stride-N)
 
 ### Level 2 — Online Softmax
-- Same 1 thread/row, but 2 passes using running (m, O)
-- Pass 1: online max + exp sum accumulation
-- Pass 2: normalize
-- ~25% faster by eliminating one full-row scan
+- 同样 1 线程/行，但用运行 (m, O) 降到 2 次遍历
+- Pass 1：在线递推最大值 + exp 和
+- Pass 2：归一化
+- 减少一次全行扫描，快 ~25%
 
 ### Level 3 — Warp-Level Online Softmax
-- 1 warp (32 threads) per row, 2 passes
-- Each thread handles N/32 elements with stride-32 → coalesced access
-- Warp reduce (`__shfl_down_sync`) merges 32 local (m, O) into global
-- **5-19x** faster depending on dimensions
+- 1 warp (32 线程)/行，2 次遍历
+- 每线程 stride-32 处理 N/32 个元素 → 完美合并访存
+- Warp Reduce (`__shfl_down_sync`) 将 32 个局部 (m, O) 合并为全局值
+- **5-19x** 加速，取决于维度
 
-## Documentation
+## 核心发现
 
-`docs/softmax_analysis.md` — full analysis covering:
-- GPU softmax algorithm derivation
-- Three kernel code walkthrough
-- Performance analysis across dimensions
-- Why warp-level dominates (coalesced access + parallelism)
+- **合并访存是 Softmax 优化的根基**：Warp 级 stride-32 访存比单线程 stride-N 快 5-19x
+- **Warp Reduce 零延迟**：`__shfl_down_sync` 在寄存器间传输，~5 cycles，不需要 Shared Memory
+- **单线程/行是 GPU 最差的使用方式**：N=4096 时每线程串行 12288 次全局内存访问
+
+## 文档
+
+`docs/softmax_analysis.md` — 完整分析，涵盖：
+- Softmax 算法推导（含 Online Softmax 递推公式证明）
+- 三级 kernel 源码走读
+- 多维度性能分析
+- Warp 级并行为何碾压单线程
 
 ## License
 

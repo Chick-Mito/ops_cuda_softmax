@@ -168,7 +168,7 @@ __inline__ __device__ float warp_reduce_max(float val) {
 
 ### 4.3 实现
 
-```cuda
+```cpp
 __global__ void softmax_warp_online_kernel(input, output, M, N) {
     int warp_id = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
     int lane_id = threadIdx.x % 32;
