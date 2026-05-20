@@ -71,7 +71,7 @@ ops_cuda_softmax/
 
 ## Documentation
 
-`docs/softmax_analysis.md` — 8 chapters covering algorithm derivation, all 5 kernels, SMEM tiling failure analysis, cuBLAS gap breakdown.
+`docs/softmax_analysis.md` — 9 chapters covering algorithm derivation, all 5 kernels, NCU profiling, SMEM tiling failure analysis, cuBLAS gap breakdown.
 
 ## License
 

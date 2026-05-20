@@ -76,7 +76,7 @@ ops_cuda_softmax/
 
 ## 文档
 
-`docs/softmax_analysis.md` — 8 章完整分析，涵盖：
+`docs/softmax_analysis.md` — 9 章完整分析，涵盖：
 - Softmax 算法推导（含 Online Softmax 递推公式证明）
 - 五级 kernel 源码走读 + 实测对比
 - SMEM tiling 为何对 Softmax 无效的深度分析
